@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -18,50 +19,43 @@ type Album struct {
 	Price  float64 `json:"price"`
 }
 
-func Create() {
+func Create(album *Album) {
 	posturl := "http://localhost:9000/albuns"
 
-	body := []byte(`{
-		"title": "Titulo",
-		"artist": "Artista",
-		"price": 20.50
-	}`)
+	json_data, err := json.Marshal(album)
 
-	r, err := http.NewRequest("POST", posturl, bytes.NewBuffer(body))
 	if err != nil {
 		panic(err)
 	}
 
-	r.Header.Add("Content-Type", "application/json")
+	r, err := http.Post(posturl, "application/json", bytes.NewBuffer(json_data))
 
-	client := &http.Client{}
-	res, err := client.Do(r)
 	if err != nil {
 		panic(err)
 	}
 
-	defer res.Body.Close()
+	defer r.Body.Close()
 
-	album := &Album{}
-	derr := json.NewDecoder(res.Body).Decode(album)
-	if derr != nil {
-		panic(derr)
+	var res map[string]interface{}
+
+	json.NewDecoder(r.Body).Decode(&res)
+
+	if r.StatusCode != http.StatusCreated {
+		panic(r.Status)
 	}
 
-	if res.StatusCode != http.StatusCreated {
-		panic(res.Status)
-	}
-
-	fmt.Println("Ttitle:", album.Title)
+	fmt.Println("Title:", album.Title)
 	fmt.Println("Artist:", album.Artist)
 	fmt.Println("Price:", album.Price)
 }
 
 func main() {
+	var album Album
 	myapp := app.New()
 	myWindow := myapp.NewWindow("Web Service")
 
-	myWindow.Resize(fyne.NewSize(500, 500))
+	myWindow.Resize(fyne.NewSize(500, 300))
+	myWindow.CenterOnScreen()
 
 	input := widget.NewEntry()
 	input.SetPlaceHolder("Album")
@@ -77,7 +71,13 @@ func main() {
 		input1,
 		input2,
 		widget.NewButton("Create", func() {
-			Create()
+
+			album.Title = input.Text
+			album.Artist = input1.Text
+			if s, err := strconv.ParseFloat(input2.Text, 64); err == nil {
+				album.Price = s
+			}
+			Create(&album)
 		}))
 
 	myWindow.SetContent(content)
